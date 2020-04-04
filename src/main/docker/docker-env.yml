@@ -1,0 +1,42 @@
+version: '3'
+services:
+    sgms-repository-dev:
+        image: registry.apps.man.poznan.pl/agrobank/repository:2.0.0
+        hostname: repository
+        container_name: sgms-repository
+        restart: always
+        environment:
+             - DB_USERNAMES=sgms,sgms_dev
+             - DB_PASSWORDS=pass,pass
+             - DB_DATABASES=sgms,sgms_dev
+        ports:
+            - 5433:5432
+        volumes:
+            - ~/agrobank_volumes/dev/repository/postgres-data:/var/lib/postgresql/data
+
+    sgms-message-broker-dev:
+        image: registry.apps.man.poznan.pl/agrobank/sgms-prototype-message-broker:dev
+        container_name: sgms-message-broker
+        hostname: "message-broker"
+        restart: always
+        environment:
+            RABBITMQ_ERLANG_COOKIE: "SWQOKODSQALRPCLNMEQG"
+            RABBITMQ_DEFAULT_USER: "guest"
+            RABBITMQ_DEFAULT_PASS: "guest"
+            RABBITMQ_DEFAULT_VHOST: "/"
+        ports:
+            - "15672:15672"
+            - "5672:5672"
+        depends_on:
+            - sgms-repository-dev
+
+    pgadmin:
+        image: crunchydata/crunchy-pgadmin4:centos7-10.4-2.0.0
+        environment:
+            - PGADMIN_SETUP_EMAIL=a@wp.pl
+            - PGADMIN_SETUP_PASSWORD=a
+            - SERVER_PORT=5050        
+        ports:
+            - 5050:5050
+        volumes:
+            - ~/agrobank_volumes/dev/repository/pgadmin:/pgdata

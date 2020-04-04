@@ -1,0 +1,412 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>pl.hamerhed</groupId>
+	<artifactId>file-upload-demo</artifactId>
+	<version>1.0.0</version>
+	<packaging>jar</packaging>
+
+	<name>file-upload-demo</name>
+
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>2.0.7.RELEASE</version>
+		<relativePath /> <!-- lookup parent from repository -->
+	</parent>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<java.version>1.8</java.version>
+		<start-class>pl.hamerhed.fileupload.demo.app.AppServer</start-class>
+		<docker-registry-hostname></docker-registry-hostname>
+		<docker-repository-name></docker-repository-name>
+		<image-name>file-upload-demo</image-name>
+		<finalName>file-upload-name</finalName>
+
+		<dockerfile-maven-plugin.version>1.4.9</dockerfile-maven-plugin.version>
+		<top.project.name>hamerhed</top.project.name>
+	</properties>
+
+	<dependencies>
+		<!-- 
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+	-->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+		<!-- 
+		<dependency>
+			<groupId>org.springframework.amqp</groupId>
+			<artifactId>spring-rabbit</artifactId>
+			<version>2.0.3.RELEASE</version>
+		</dependency>
+		-->
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<version>42.2.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.liquibase</groupId>
+			<artifactId>liquibase-core</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.liquibase</groupId>
+			<artifactId>liquibase-maven-plugin</artifactId>
+			<version>3.5.5</version>
+		</dependency>
+
+		<dependency>
+			<groupId>commons-lang</groupId>
+			<artifactId>commons-lang</artifactId>
+			<version>2.6</version>
+		</dependency>
+
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<version>1.4.197</version>
+			<scope>test</scope>
+		</dependency>
+	</dependencies>
+
+	<build>
+		<filters>
+			<filter>src/main/profiles/${config-name}.properties</filter>
+		</filters>
+
+		<defaultGoal>spring-boot:run</defaultGoal>
+
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+
+		<testResources>
+			<testResource>
+				<directory>src/test/resources/</directory>
+			</testResource>
+		</testResources>
+		<plugins>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>repackage</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<mainClass>${start-class}</mainClass>
+					<executable>true</executable>
+					<fork>true</fork>
+				</configuration>
+			</plugin>
+
+			<plugin>
+				<groupId>org.liquibase</groupId>
+				<artifactId>liquibase-maven-plugin</artifactId>
+				<version>3.5.5</version>
+				<configuration>
+					<!-- general configuration.Specific configuration of data sources is 
+						placed at profiles -->
+					<changeLogFile>src/main/resources/liquibase/master.xml</changeLogFile>
+					<diffChangeLogFile>src/main/resources/liquibase/diff/${maven.build.timestamp}_changelog.xml</diffChangeLogFile>
+					<outputChangeLogFile>src/main/resources/liquibase/${maven.build.timestamp}_changelog_x.xml</outputChangeLogFile>
+					<verbose>true</verbose>
+					<logging>debug</logging>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>org.javassist</groupId>
+						<artifactId>javassist</artifactId>
+						<version>3.22.0-GA</version>
+					</dependency>
+					<dependency>
+						<groupId>org.liquibase.ext</groupId>
+						<artifactId>liquibase-hibernate5</artifactId>
+						<version>3.6</version>
+					</dependency>
+					<dependency>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-starter-data-jpa</artifactId>
+						<version>2.0.7.RELEASE</version>
+					</dependency>
+					<dependency>
+						<groupId>javax.validation</groupId>
+						<artifactId>validation-api</artifactId>
+						<version>2.0.1.Final</version>
+					</dependency>
+				</dependencies>
+			</plugin>
+
+			<plugin>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>copy-app-for-dockerization</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+
+						<configuration>
+							<outputDirectory>${project.basedir}/src/main/docker</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${project.build.directory}</directory>
+									<includes>
+										<include>${finalName}.jar</include>
+									</includes>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<plugin>
+				<groupId>com.spotify</groupId>
+				<artifactId>dockerfile-maven-plugin</artifactId>
+				<version>${dockerfile-maven-plugin.version}</version>
+				<configuration>
+					<contextDirectory>${project.basedir}/src/main/docker</contextDirectory>
+					<googleContainerRegistryEnabled>false</googleContainerRegistryEnabled>
+					<pullNewerImage>true</pullNewerImage>
+					<repository>${docker-registry-hostname}/${top.project.name}/${finalName}</repository>
+					<tag>dev</tag>
+					<buildArgs>
+						<JAR_FILE>./${finalName}.jar</JAR_FILE>
+					</buildArgs>
+				</configuration>
+			</plugin>
+		</plugins>
+
+
+		<pluginManagement>
+			<plugins>
+				<plugin>
+					<artifactId>maven-install-plugin</artifactId>
+					<configuration>
+						<skip>true</skip>
+					</configuration>
+				</plugin>
+				<plugin>
+					<artifactId>maven-deploy-plugin</artifactId>
+					<configuration>
+						<skip>true</skip>
+					</configuration>
+				</plugin>
+			</plugins>
+		</pluginManagement>
+	</build>
+
+	<profiles>
+		<profile>
+			<id>dev</id>
+			<properties>
+				<config-name>dev</config-name>
+			</properties>
+
+			<dependencies>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-undertow</artifactId>
+				</dependency>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-devtools</artifactId>
+					<optional>true</optional>
+				</dependency>
+			</dependencies>
+
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/profiles/dev</directory>
+					</resource>
+				</resources>
+				<plugins>
+					<plugin>
+						<groupId>com.spotify</groupId>
+						<artifactId>dockerfile-maven-plugin</artifactId>
+
+						<executions>
+							<execution>
+								<id>build-latest</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>build</goal>
+								</goals>
+								<configuration>
+									<repository>${image-name}</repository>
+									<tag>latest</tag>
+								</configuration>
+							</execution>
+							<execution>
+								<id>build-dev-version</id>
+								<phase>install</phase>
+								<goals>
+									<goal>tag</goal>
+								</goals>
+								<configuration>
+									<repository>${docker-repository-name}/${image-name}</repository>
+									<tag>dev</tag>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>org.liquibase</groupId>
+						<artifactId>liquibase-maven-plugin</artifactId>
+						<configuration>
+							<driver>org.postgresql.Driver</driver>
+							<url>jdbc:postgresql://localhost:5433/db</url>
+							<defaultSchemaName></defaultSchemaName>
+							<username>db_user</username>
+							<password>pass</password>
+							<!-- compare database scheme against domain model -->
+							<referenceUrl>hibernate:spring:pl.hamerhed.model?dialect=org.hibernate.dialect.PostgreSQL82Dialect&amp;hibernate.physical_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringPhysicalNamingStrategy&amp;hibernate.implicit_naming_strategy=org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy</referenceUrl>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+
+		<profile>
+			<id>prod</id>
+			<properties>
+				<config-name>prod</config-name>
+			</properties>
+			<dependencies>
+				<dependency>
+					<groupId>org.springframework.boot</groupId>
+					<artifactId>spring-boot-starter-undertow</artifactId>
+				</dependency>
+			</dependencies>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.springframework.boot</groupId>
+						<artifactId>spring-boot-maven-plugin</artifactId>
+						<configuration>
+							<mainClass>${start-class}</mainClass>
+							<executable>true</executable>
+						</configuration>
+						<executions>
+							<execution>
+								<goals>
+									<goal>build-info</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>com.spotify</groupId>
+						<artifactId>dockerfile-maven-plugin</artifactId>
+
+						<executions>
+							<execution>
+								<id>build-latest</id>
+								<phase>verify</phase>
+								<goals>
+									<goal>build</goal>
+								</goals>
+								<configuration>
+									<repository>${image-name}</repository>
+									<tag>latest</tag>
+								</configuration>
+							</execution>
+
+							<execution>
+								<id>tag-docker-image</id>
+								<phase>install</phase>
+								<goals>
+									<goal>tag</goal>
+								</goals>
+								<configuration>
+									<repository>${image-name}</repository>
+									<tag>${project.version}</tag>
+								</configuration>
+							</execution>
+
+							<execution>
+								<id>push-latest</id>
+								<phase>deploy</phase>
+								<goals>
+									<goal>tag</goal>
+									<goal>push</goal>
+								</goals>
+								<configuration>
+									<repository>${docker-registry-hostname}/${top.project.name}/${image-name}</repository>
+									<tag>latest</tag>
+									<useMavenSettingsForAuth>true</useMavenSettingsForAuth>
+								</configuration>
+							</execution>
+
+							<execution>
+								<id>push-version</id>
+								<phase>deploy</phase>
+								<goals>
+									<goal>tag</goal>
+									<goal>push</goal>
+								</goals>
+								<configuration>
+									<repository>${docker-registry-hostname}/${top.project.name}/${image-name}</repository>
+									<tag>${project.version}</tag>
+									<useMavenSettingsForAuth>true</useMavenSettingsForAuth>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+
+					<plugin>
+						<groupId>org.liquibase</groupId>
+						<artifactId>liquibase-maven-plugin</artifactId>
+						<configuration>
+							<driver>org.postgresql.Driver</driver>
+							<url>jdbc:postgresql://localhost:5432/db</url>
+							<defaultSchemaName></defaultSchemaName>
+							<username>db_user</username>
+							<password>pass</password>
+							<!-- change according to real production base url -->
+							<referenceUrl></referenceUrl>
+						</configuration>
+					</plugin>
+
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+</project>

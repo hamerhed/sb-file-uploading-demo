@@ -1,0 +1,46 @@
+version: '3'
+services:
+    sgms-repository:
+        image: registry.apps.man.poznan.pl/agrobank/repository:2.0.0
+        hostname: repository
+        restart: always
+        container_name: sgms-repository
+        environment:
+             - DB_USERNAMES=sgms,sgms_dev
+             - DB_PASSWORDS=pass,pass
+             - DB_DATABASES=sgms,sgms_dev
+        ports:
+            - 5433:5432
+        volumes:
+            - ~/agrobank_volumes/dev/repository/sgms/postgres-data:/var/lib/postgresql/data
+
+    sgms-message-broker:
+        image: registry.apps.man.poznan.pl/agrobank/sgms-prototype-message-broker:dev
+        hostname: "message-broker"
+        container_name: sgms-message-broker
+        restart: always
+        environment:
+            RABBITMQ_ERLANG_COOKIE: "SWQOKODSQALRPCLNMEQG"
+            RABBITMQ_DEFAULT_USER: "guest"
+            RABBITMQ_DEFAULT_PASS: "guest"
+            RABBITMQ_DEFAULT_VHOST: "/"
+        ports:
+            - "15672:15672"
+            - "5672:5672"
+        depends_on:
+            - sgms-repository
+
+    sgms-rfid-connector:
+        image: registry.apps.man.poznan.pl/agrobank/sgms-rfid-connector:dev
+        container_name: sgms-rfid-connector
+        environment:
+            - _JAVA_OPTIONS=-Xmx512m -Xms256m
+            - SPRING_PROFILES_ACTIVE=prod 
+            - SPRING_DATASOURCE_URL=jdbc:postgresql://sgms-repository:5432/sgms_dev
+            - SPRING_RABBITMQ_HOST=sgms-message-broker
+            - WAIT_FOR_SERVICE=sgms-message-broker:5672
+            - WAIT_FOR_SERVICE_TIMEOUT=0
+        ports:
+            - 8060:8080
+        depends_on:
+            - sgms-message-broker
