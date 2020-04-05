@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.validation.Valid;
 
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -111,6 +114,41 @@ public class FileUploadController {
 		
 		//TODO make update
 		return ResponseEntity.ok().build();
+	}
+
+	/**
+	 * Enables uploading multiple files with set of metadata for each of file item.
+	 * The workaround is to pass all metadata as a request part.
+	 * The client needs to take care of preparing metadata and connection key between MultipartFile file and metadata item.
+	 * It seems that Spring preserves items order so here the index-based approach was used. 
+	 * @param id
+	 * @param files
+	 * @param metadata
+	 * @return
+	 */
+	@PutMapping(path = "/updateMultiFiles/{id}", consumes = {"multipart/form-data"})
+	public ResponseEntity updateMultipleFilesWithMetadata(@PathVariable("id") Long id, @RequestPart("files") MultipartFile[] files, @RequestPart("metadata") FileMetadata[] metadata) {
+		clog.debug("metadata len " + metadata.length);
+		clog.debug("files len " + files.length);
+		
+		int counter = 0;
+		for (FileMetadata fileMetadata : metadata) {
+			for (MultipartFile file : files) {
+				if(file.getOriginalFilename().equals(fileMetadata.getFilename())) {
+					counter++;
+					break;
+				}
+			}
+		}
+		if(counter != files.length) return ResponseEntity.badRequest().body("different length");
+		
+		List<FileUploadResult> results = new ArrayList<>();
+		for(int i = 0; files != null && i < files.length; i++) {
+			FileMetadata item = metadata[i];
+			FileUploadResult res = new FileUploadResult(item.getFilename(), item.getKey(), item.getTitle(), files[i].getOriginalFilename(), files[i].getSize());
+			results.add(res);
+		}
+		return ResponseEntity.ok(results);
 	}
 	
 	@GetMapping(path = "/test")
