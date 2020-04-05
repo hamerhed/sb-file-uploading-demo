@@ -2,16 +2,25 @@ package pl.hamerhed.fileupload.demo.app.controller;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.BindException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
+import javax.validation.ConstraintViolation;
 import javax.validation.Valid;
+import javax.validation.Validation;
+import javax.validation.Validator;
+import javax.validation.ValidatorFactory;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.bind.BindResult;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,11 +32,16 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import liquibase.util.Validate;
+
 @RestController
 public class FileUploadController {
 	private static final String BASE_PATH = "target" + File.separator;
 	
 	private static final org.slf4j.Logger clog = org.slf4j.LoggerFactory.getLogger(FileUploadController.class);
+	
+	@Autowired
+	private Validator validator;
 	
 	@PostMapping("/upload")
 	public ResponseEntity uploadToLocalFileSystem(@RequestParam("file") MultipartFile file) {
@@ -121,15 +135,28 @@ public class FileUploadController {
 	 * The workaround is to pass all metadata as a request part.
 	 * The client needs to take care of preparing metadata and connection key between MultipartFile file and metadata item.
 	 * It seems that Spring preserves items order so here the index-based approach was used. 
+	 * But it looks like @Valid does not work on arrays so the validation must be done by own before domain code execution.
 	 * @param id
 	 * @param files
 	 * @param metadata
 	 * @return
+	 * @throws BindException 
 	 */
 	@PutMapping(path = "/updateMultiFiles/{id}", consumes = {"multipart/form-data"})
-	public ResponseEntity updateMultipleFilesWithMetadata(@PathVariable("id") Long id, @RequestPart("files") MultipartFile[] files, @RequestPart("metadata") FileMetadata[] metadata) {
+	public ResponseEntity updateMultipleFilesWithMetadata(@PathVariable("id") Long id, @RequestPart("files") @Valid MultipartFile[] files,
+			@RequestPart("metadata") FileMetadata[] metadata
+			 ) throws BindException {
 		clog.debug("metadata len " + metadata.length);
 		clog.debug("files len " + files.length);
+		
+		//TODO make own validation
+		for (FileMetadata item : metadata) {
+			//TODO a batter way of errors processing and executing controllerAdvice
+			Set<ConstraintViolation<FileMetadata>> errors = validate(item);
+			if(errors.size() > 0) {
+				return ResponseEntity.badRequest().build();
+			}
+		}
 		
 		int counter = 0;
 		for (FileMetadata fileMetadata : metadata) {
@@ -140,8 +167,10 @@ public class FileUploadController {
 				}
 			}
 		}
+		
 		if(counter != files.length) return ResponseEntity.badRequest().body("different length");
 		
+		//domain code
 		List<FileUploadResult> results = new ArrayList<>();
 		for(int i = 0; files != null && i < files.length; i++) {
 			FileMetadata item = metadata[i];
@@ -149,6 +178,13 @@ public class FileUploadController {
 			results.add(res);
 		}
 		return ResponseEntity.ok(results);
+	}
+	
+	
+	private Set<ConstraintViolation<FileMetadata>> validate(FileMetadata metadata) {
+		ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
+		Validator validator = factory.getValidator();
+		return validator.validate(metadata);
 	}
 	
 	@GetMapping(path = "/test")

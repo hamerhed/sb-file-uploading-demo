@@ -243,4 +243,30 @@ public class FileUploadControllerTest {
 		assertThat(results[1].getFileLength()).isEqualTo(file2.getSize());
 		assertThat(results[1].getKey()).isEqualTo("model_2");
 	}
+	
+	@Test
+	public void testUpdateMultiFilesWithEmptyTitles() throws Exception {
+		MockMultipartFile file = new MockMultipartFile("files", "new_file.txt", "text/plain",
+				"new file content".getBytes());
+		MockMultipartFile file2 = new MockMultipartFile("files", "new_file2.txt", "text/plain",
+				"new file2 content".getBytes());
+
+		FileMetadata[] params = {new FileMetadata("new_file.txt", "model_1", ""),
+								 new FileMetadata("new_file2.txt", "model_2", "")};
+		
+		MockMultipartFile metadata = new MockMultipartFile("metadata", "", "application/json", mapper.writeValueAsBytes(params));
+		// as file multipart by default uses POST change it to PUT with postprocessing
+		MockHttpServletRequestBuilder builder = MockMvcRequestBuilders.multipart("/updateMultiFiles/1").file(file)
+				.file(file2)
+				.file(metadata)
+				.with(new RequestPostProcessor() {
+					@Override
+					public MockHttpServletRequest postProcessRequest(MockHttpServletRequest request) {
+						request.setMethod("PUT");
+						return request;
+					}
+				});
+
+		mockMvc.perform(builder).andExpect(status().isBadRequest());
+	}
 }

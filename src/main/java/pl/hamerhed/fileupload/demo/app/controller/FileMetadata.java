@@ -1,6 +1,10 @@
 package pl.hamerhed.fileupload.demo.app.controller;
 
+import javax.validation.constraints.NotEmpty;
+
 class FileMetadata {
+	
+	@NotEmpty
 	private String title;
 	private String filename;
 	private String key;
